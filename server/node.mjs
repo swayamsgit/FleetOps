@@ -1,0 +1,10 @@
+import { DatabaseSync } from 'node:sqlite';
+import { createServer } from 'node:http';
+import { migrate } from './migrate.mjs';
+import { api } from './api.mjs';
+const sqlite=new DatabaseSync(process.env.DATABASE_PATH || 'fleetops.sqlite');
+sqlite.exec('PRAGMA journal_mode=WAL');
+migrate(sqlite);
+import { adapter } from './sqlite-adapter.mjs';
+const db=adapter(sqlite);
+createServer(async(req,res)=>{const chunks=[];for await(const c of req)chunks.push(c);const body=Buffer.concat(chunks);const response=await api(new Request('http://localhost'+req.url,{method:req.method,headers:req.headers,...(body.length?{body}: {})}),db);res.writeHead(response.status,Object.fromEntries(response.headers));res.end(await response.text())}).listen(Number(process.env.PORT||3001),'0.0.0.0');
